@@ -16,6 +16,8 @@
 
 package com.example.android.advancedcoroutines
 
+import com.example.android.advancedcoroutines.util.CacheOnSuccess
+import com.example.android.advancedcoroutines.utils.ComparablePair
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -39,6 +41,11 @@ class PlantRepository private constructor(
      * Returns a LiveData-wrapped List of Plants.
      */
     val plants = plantDao.getPlants()
+
+    private var plantsListSortOrderCache =
+        CacheOnSuccess(onErrorFallback = { listOf<String>() }) {
+            plantService.customPlantSortOrder()
+        }
 
     /**
      * Fetch a list of [Plant]s from the database that matches a given [GrowZone].
@@ -94,11 +101,21 @@ class PlantRepository private constructor(
     companion object {
 
         // For Singleton instantiation
-        @Volatile private var instance: PlantRepository? = null
+        @Volatile
+        private var instance: PlantRepository? = null
 
         fun getInstance(plantDao: PlantDao, plantService: NetworkService) =
             instance ?: synchronized(this) {
                 instance ?: PlantRepository(plantDao, plantService).also { instance = it }
             }
+    }
+}
+
+private fun List<Plant>.applySort(customSortOrder: List<String>): List<Plant> {
+    return sortedBy { plant ->
+        val positionForItem = customSortOrder.indexOf(plant.plantId).let { order ->
+            if (order > -1) order else Int.MAX_VALUE
+        }
+        ComparablePair(positionForItem, plant.name)
     }
 }
