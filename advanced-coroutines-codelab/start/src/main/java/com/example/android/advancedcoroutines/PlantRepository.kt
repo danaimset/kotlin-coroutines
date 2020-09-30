@@ -23,7 +23,13 @@ import com.example.android.advancedcoroutines.util.CacheOnSuccess
 import com.example.android.advancedcoroutines.utils.ComparablePair
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /**
@@ -35,6 +41,8 @@ import kotlinx.coroutines.withContext
  * To update the plants cache, call [tryUpdateRecentPlantsForGrowZoneCache] or
  * [tryUpdateRecentPlantsCache].
  */
+@ExperimentalCoroutinesApi
+@FlowPreview
 class PlantRepository private constructor(
     private val plantDao: PlantDao,
     private val plantService: NetworkService,
@@ -55,11 +63,26 @@ class PlantRepository private constructor(
 
     val plantsFlow: Flow<List<Plant>>
         get() = plantDao.getPlantsFlow()
+            // When the result of customSortFlow is available,
+            // this will combine it with the latest value from
+            // the flow above.  Thus, as long as both `plants`
+            // and `sortOrder` are have an initial value (their
+            // flow has emitted at least one value), any change
+            // to either `plants` or `sortOrder`  will call
+            // `plants.applySort(sortOrder)`.
+            .combine(customSortFlow) { plants, sortOrder ->
+                plants.applySort(sortOrder)
+            }
+            .flowOn(defaultDispatcher)
+            .conflate()
 
     private var plantsListSortOrderCache =
         CacheOnSuccess(onErrorFallback = { listOf<String>() }) {
             plantService.customPlantSortOrder()
         }
+
+    // Create a flow that calls a single function
+    private val customSortFlow = plantsListSortOrderCache::getOrAwait.asFlow()
 
     /**
      * Fetch a list of [Plant]s from the database that matches a given [GrowZone].
