@@ -16,7 +16,12 @@
 
 package com.example.android.advancedcoroutines
 
-import androidx.lifecycle.*
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asLiveData
+import androidx.lifecycle.switchMap
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -27,7 +32,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
@@ -56,6 +60,7 @@ class PlantListViewModel internal constructor(
         get() = _snackbar
 
     private val _spinner = MutableLiveData<Boolean>(false)
+
     /**
      * Show a loading spinner if true
      */
@@ -93,18 +98,13 @@ class PlantListViewModel internal constructor(
         // When creating a new ViewModel, clear the grow zone and perform any related udpates
         clearGrowZoneNumber()
 
-        growZoneChannel.asFlow()
-            .mapLatest { growZone ->
-                _spinner.value = true
-                if (growZone == NoGrowZone) {
-                    plantRepository.tryUpdateRecentPlantsCache()
-                } else {
-                    plantRepository.tryUpdateRecentPlantsForGrowZoneCache(growZone)
-                }
+        loadDataFor(growZoneChannel) { growZone ->
+            if (growZone == NoGrowZone) {
+                plantRepository.tryUpdateRecentPlantsCache()
+            } else {
+                plantRepository.tryUpdateRecentPlantsForGrowZoneCache(growZone)
             }
-            .onCompletion { _spinner.value = false }
-            .catch { throwable -> _snackbar.value = throwable.message }
-            .launchIn(viewModelScope)
+        }
     }
 
     /**
@@ -169,5 +169,17 @@ class PlantListViewModel internal constructor(
                 _spinner.value = false
             }
         }
+    }
+
+    private fun <T> loadDataFor(source: ConflatedBroadcastChannel<T>, block: suspend (T) -> Unit) {
+        source.asFlow()
+            .mapLatest { growZone ->
+                _spinner.value = true
+                block.invoke(growZone)
+                _spinner.value = false
+            }
+            .onCompletion { _spinner.value = false }
+            .catch { throwable -> _snackbar.value = throwable.message }
+            .launchIn(viewModelScope)
     }
 }
