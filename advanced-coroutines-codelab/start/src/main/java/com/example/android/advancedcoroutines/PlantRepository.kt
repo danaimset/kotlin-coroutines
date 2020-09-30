@@ -23,6 +23,7 @@ import com.example.android.advancedcoroutines.util.CacheOnSuccess
 import com.example.android.advancedcoroutines.utils.ComparablePair
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 /**
@@ -52,6 +53,9 @@ class PlantRepository private constructor(
         })
     }
 
+    val plantsFlow: Flow<List<Plant>>
+        get() = plantDao.getPlantsFlow()
+
     private var plantsListSortOrderCache =
         CacheOnSuccess(onErrorFallback = { listOf<String>() }) {
             plantService.customPlantSortOrder()
@@ -69,6 +73,10 @@ class PlantRepository private constructor(
                     emit(plantList.applyMainSafeSort(customSortOrder))
                 }
             }
+
+    fun getPlantsWithGrowZoneFlow(growZone: GrowZone): Flow<List<Plant>> {
+        return plantDao.getPlantsWithGrowZoneNumberFlow(growZone.number)
+    }
 
     /**
      * Returns true if we should make a network request.
