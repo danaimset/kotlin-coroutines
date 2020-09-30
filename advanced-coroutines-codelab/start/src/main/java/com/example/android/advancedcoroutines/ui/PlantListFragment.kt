@@ -34,7 +34,11 @@ import com.example.android.advancedcoroutines.R
 import com.example.android.advancedcoroutines.databinding.FragmentPlantListBinding
 import com.example.android.advancedcoroutines.utils.Injector
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 
+@ExperimentalCoroutinesApi
+@FlowPreview
 class PlantListFragment : Fragment() {
 
     private val viewModel: PlantListViewModel by viewModels {
@@ -104,6 +108,8 @@ class PlantListFragment : Fragment() {
 /**
  * Factory for creating a [PlantListViewModel] with a constructor that takes a [PlantRepository].
  */
+@ExperimentalCoroutinesApi
+@FlowPreview
 class PlantListViewModelFactory(
     private val repository: PlantRepository
 ) : ViewModelProvider.NewInstanceFactory() {

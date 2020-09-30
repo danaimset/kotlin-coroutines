@@ -22,7 +22,12 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
@@ -88,8 +93,18 @@ class PlantListViewModel internal constructor(
         // When creating a new ViewModel, clear the grow zone and perform any related udpates
         clearGrowZoneNumber()
 
-        // fetch the full plant list
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
+        growZoneChannel.asFlow()
+            .mapLatest { growZone ->
+                _spinner.value = true
+                if (growZone == NoGrowZone) {
+                    plantRepository.tryUpdateRecentPlantsCache()
+                } else {
+                    plantRepository.tryUpdateRecentPlantsForGrowZoneCache(growZone)
+                }
+            }
+            .onCompletion { _spinner.value = false }
+            .catch { throwable -> _snackbar.value = throwable.message }
+            .launchIn(viewModelScope)
     }
 
     /**
@@ -103,7 +118,7 @@ class PlantListViewModel internal constructor(
         growZoneChannel.offer(GrowZone(num))
 
         // initial code version, will move during flow rewrite
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
+        // launchDataLoad { plantRepository.tryUpdateRecentPlantsForGrowZoneCache(GrowZone(num)) }
     }
 
     /**
@@ -117,7 +132,7 @@ class PlantListViewModel internal constructor(
         growZoneChannel.offer(NoGrowZone)
 
         // initial code version, will move during flow rewrite
-        launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
+        // launchDataLoad { plantRepository.tryUpdateRecentPlantsCache() }
     }
 
     /**
